@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Food Delivery — Order Prototype Demo</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa4b2;--accent:#ff6b6b}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{background:linear-gradient(180deg,#071024 0%, #07192d 60%);color:#e6eef6;padding:28px;}
+    .app{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    small{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:20px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    ul.orders{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+    li.order{display:flex;align-items:flex-start;gap:12px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.02)}
+    .meta{flex:1}
+    .title{font-weight:600}
+    .meta small{display:block;color:var(--muted);margin-top:6px}
+    .badge{background:linear-gradient(90deg,var(--accent),#ffb86b);padding:6px 10px;border-radius:10px;color:#111;font-weight:700}
+    .btn{background:transparent;border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:8px;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#0b1220;border:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    .preview{font-size:13px;color:var(--muted);line-height:1.3}
+    .log{height:230px;overflow:auto;background:rgba(0,0,0,0.12);padding:10px;border-radius:8px;color:#dfe9f3}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type=text], select{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+    .row{display:flex;gap:8px}
+    .row > *{flex:1}
+    footer{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Prototype Pattern — Food Delivery (Order Clone)</h1>
+        <small>Click "Clone" to duplicate an existing order. The cloned order starts with the original's properties but is independent.</small>
+      </div>
+      <div class="badge">Demo • JS Prototype</div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Available Orders</h3>
+        <ul class="orders" id="ordersList"></ul>
+
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <button id="addSample" class="btn">Add Random Sample Order</button>
+          <button id="resetBtn" class="btn">Reset</button>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h3>Inspector</h3>
+        <div style="margin-top:8px">
+          <label>Selected Order ID</label>
+          <div id="selId" class="preview">—</div>
+
+          <label style="margin-top:10px">Editable fields (edit clone to prove independence)</label>
+          <div style="margin-top:8px">
+            <label>Customer Name<input id="custName" type="text" /></label>
+            <div class="row" style="margin-top:8px">
+              <label>Items<input id="itemsInput" type="text" placeholder="Comma separated, e.g., Paneer Tikka, Naan" /></label>
+              <label>Qty<input id="qtyInput" type="text" placeholder="1,2" /></label>
+            </div>
+            <label style="margin-top:8px">Delivery Address<input id="addressInput" type="text" /></label>
+            <label style="margin-top:8px">Notes<input id="notesInput" type="text" /></label>
+
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <button id="applyBtn" class="btn primary">Apply Changes to Selected</button>
+              <button id="revealBtn" class="btn">Show Original vs Selected</button>
+            </div>
+          </div>
+        </div>
+
+        <h3 style="margin-top:14px">Activity Log</h3>
+        <div class="log" id="log"></div>
+      </aside>
+    </div>
+
+    <footer>
+      Tip: Clone an order, then edit the cloned order fields and click "Show Original vs Selected" to see they are independent objects.
+    </footer>
+  </div>
+
+  <script>
+    // ----------------------------
+    // Prototype pattern demo: Orders
+    // ----------------------------
+
+    // Utility: generate ID
+    function uid(prefix = 'o') {
+      return prefix + '-' + Math.random().toString(36).slice(2,9)
+    }
+
+    // Deep clone helper (works in most modern browsers; fallback to JSON for plain objects)
+    function deepClone(obj) {
+      try {
+        // structuredClone is the cleanest if available
+        if (typeof structuredClone === 'function') return structuredClone(obj)
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(obj))
+    }
+
+    // Order "class" (constructor function) — could also be ES6 class.
+    function Order({id, customerName, items, address, notes} = {}){
+      this.id = id || uid()
+      this.customerName = customerName || 'Unknown'
+      this.items = items || [] // array of {name,qty}
+      this.address = address || ''
+      this.notes = notes || ''
+      this.createdAt = new Date().toISOString()
+    }
+
+    // Prototype method: clone
+    Order.prototype.clone = function() {
+      // Create a deep copy of this order, but assign a new id and createdAt.
+      const copy = deepClone(this)
+      // Ensure it's an Order instance (retain prototype)
+      const newOrder = Object.assign(Object.create(Object.getPrototypeOf(this)), copy)
+      newOrder.id = uid()
+      newOrder.createdAt = new Date().toISOString()
+      return newOrder
+    }
+
+    // For demonstration: parse items from comma separated input
+    function parseItems(namesStr, qtyStr){
+      const names = namesStr.split(',').map(s=>s.trim()).filter(Boolean)
+      const qtys = qtyStr.split(',').map(s=>parseInt(s.trim())||1)
+      return names.map((n,i)=>({name:n,qty:qtys[i]||1}))
+    }
+
+    // App state (in-memory)
+    const store = {
+      orders: []
+    }
+
+    // Some sample orders
+    function sampleOrder(i){
+      return new Order({
+        id: uid(),
+        customerName: ['Asha','Ravi','Neha','Karan'][i%4],
+        items: [{name:'Paneer Tikka',qty:1},{name:'Garlic Naan',qty:2}],
+        address: ['MG Road','Sector 12','BTM Layout','Kothrud'][i%4],
+        notes: ['No onions','','Extra spicy','Ring bell'][i%4]
+      })
+    }
+
+    // DOM refs
+    const ordersList = document.getElementById('ordersList')
+    const logEl = document.getElementById('log')
+    const selIdEl = document.getElementById('selId')
+    const custName = document.getElementById('custName')
+    const itemsInput = document.getElementById('itemsInput')
+    const qtyInput = document.getElementById('qtyInput')
+    const addressInput = document.getElementById('addressInput')
+    const notesInput = document.getElementById('notesInput')
+    const applyBtn = document.getElementById('applyBtn')
+
+    let selectedOrderId = null
+
+    function log(msg){
+      const p = document.createElement('div')
+      p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`
+      logEl.prepend(p)
+    }
+
+    function render(){
+      ordersList.innerHTML = ''
+      store.orders.forEach(order=>{
+        const li = document.createElement('li')
+        li.className = 'order'
+        li.innerHTML = `
+          <div class="meta">
+            <div class="title">${order.customerName} <small style="font-weight:400">— ${order.id}</small></div>
+            <div class="preview">${order.items.map(it=>it.name+' x'+it.qty).join(', ')}<br/><small>${order.address}</small></div>
+          </div>
+          <div class="controls">
+            <button class="btn" data-action="clone" data-id="${order.id}">Clone</button>
+            <button class="btn" data-action="select" data-id="${order.id}">Select</button>
+            <button class="btn" data-action="delete" data-id="${order.id}">Delete</button>
+          </div>
+        `
+        ordersList.appendChild(li)
+      })
+    }
+
+    // wire buttons
+    ordersList.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button')
+      if (!btn) return
+      const id = btn.dataset.id
+      const action = btn.dataset.action
+      const idx = store.orders.findIndex(o=>o.id===id)
+      if (action==='clone' && idx>-1){
+        const original = store.orders[idx]
+        const cloned = original.clone()
+        store.orders.unshift(cloned)
+        render()
+        log(`Cloned order ${original.id} -> ${cloned.id}`)
+        selectOrder(cloned.id)
+      } else if (action==='select' && idx>-1){
+        selectOrder(id)
+      } else if (action==='delete' && idx>-1){
+        const removed = store.orders.splice(idx,1)[0]
+        render()
+        log(`Deleted order ${removed.id}`)
+        if (selectedOrderId===removed.id) clearInspector()
+      }
+    })
+
+    function selectOrder(id){
+      const order = store.orders.find(o=>o.id===id)
+      if (!order) return
+      selectedOrderId = id
+      selIdEl.textContent = id
+      custName.value = order.customerName
+      itemsInput.value = order.items.map(it=>it.name).join(', ')
+      qtyInput.value = order.items.map(it=>it.qty).join(', ')
+      addressInput.value = order.address
+      notesInput.value = order.notes
+      log(`Selected ${id}`)
+    }
+
+    function clearInspector(){
+      selectedOrderId = null
+      selIdEl.textContent = '—'
+      custName.value = ''
+      itemsInput.value = ''
+      qtyInput.value = ''
+      addressInput.value = ''
+      notesInput.value = ''
+    }
+
+    applyBtn.addEventListener('click', ()=>{
+      if (!selectedOrderId) { alert('Select an order (prefer a clone) first'); return }
+      const order = store.orders.find(o=>o.id===selectedOrderId)
+      if (!order) return
+      // modify in-place (to demonstrate independence between original and clone, the clone must have a unique id)
+      order.customerName = custName.value || order.customerName
+      order.items = parseItems(itemsInput.value || order.items.map(i=>i.name).join(', '), qtyInput.value || order.items.map(i=>i.qty).join(','))
+      order.address = addressInput.value || order.address
+      order.notes = notesInput.value || order.notes
+      render()
+      log(`Applied edits to ${order.id}`)
+    })
+
+    document.getElementById('addSample').addEventListener('click', ()=>{
+      const num = Math.floor(Math.random()*4)
+      const o = sampleOrder(num)
+      store.orders.unshift(o)
+      render()
+      log(`Added sample order ${o.id}`)
+    })
+
+    document.getElementById('resetBtn').addEventListener('click', ()=>{
+      store.orders = [sampleOrder(0), sampleOrder(1), sampleOrder(2)]
+      render()
+      clearInspector()
+      log('Reset to 3 sample orders')
+    })
+
+    document.getElementById('revealBtn').addEventListener('click', ()=>{
+      if (!selectedOrderId) { alert('Select an order to compare') ; return }
+      const selected = store.orders.find(o=>o.id===selectedOrderId)
+      if (!selected) return
+      // find if there's an original with same signature (for demo we look at items+address+createdAt difference)
+      // But better: when cloning we log mapping; users can visually compare
+      const originals = store.orders.filter(o=>o!==selected)
+      let msg = `Selected (${selected.id}):\n` + JSON.stringify(selected, null, 2)
+      msg += '\n\nOther orders:\n' + JSON.stringify(originals.slice(0,3), null, 2)
+      // show in alert for clarity
+      const win = window.open('', '', 'width=700,height=600,scrollbars=1')
+      win.document.write('<pre style="white-space:pre-wrap;font-family:monospace;padding:12px">'+msg.replace(/</g,'&lt;')+'</pre>')
+    })
+
+    // initialize
+    (function init(){
+      store.orders = [sampleOrder(0), sampleOrder(1), sampleOrder(2)]
+      render()
+      log('Initialized with 3 sample orders')
+    })()
+
+    // Expose a global for debugging in console
+    window._ordersDemo = {store, Order}
+  </script>
+</body>
+</html>
